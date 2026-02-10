@@ -2,6 +2,8 @@ import Staff from "../models/Staff.js";
 import Society from "../models/Society.js";
 import { generateAccessToken, generateRefreshToken } from "../config/jwt.js";
 import { sendSMS } from "../utils/sms.js";
+import redisClient from "../config/redis.js";
+
 
 /**
  * POST /staff/send-otp
@@ -91,6 +93,19 @@ export const loginStaff = async (req, res) => {
     // Fetch society name
     const society = await Society.findById(staff.societyId);
 
+    // Cache staff session in Redis (TTL: 1 hour)
+    const sessionData = {
+      id: staff._id,
+      societyId: staff.societyId,
+      mobile: staff.mobile,
+      displayName: staff.displayName,
+      email: staff.email,
+      role: staff.role,
+      preferences: staff.preferences,
+      type: "staff"
+    };
+    await redisClient.set(`user:${staff._id}`, JSON.stringify(sessionData), "EX", 3600);
+
     // Return response matching the structure expected by frontend
     res.json({
       accessToken,
@@ -107,6 +122,7 @@ export const loginStaff = async (req, res) => {
         type: "staff"
       }
     });
+
 
   } catch (err) {
     res.status(500).json({ error: err.message });
